@@ -1,0 +1,7 @@
+<!-- Basic SVG icon that will serve as placeholder -->
+<svg width="192" height="192" viewBox="0 0 192 192" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="192" height="192" rx="24" fill="#1f2937"/>
+  <path d="M96 48C121.405 48 142 68.595 142 94C142 119.405 121.405 140 96 140C70.595 140 50 119.405 50 94C50 68.595 70.595 48 96 48Z" fill="#667eea"/>
+  <path d="M96 68C110.359 68 122 79.641 122 94C122 108.359 110.359 120 96 120C81.641 120 70 108.359 70 94C70 79.641 81.641 68 96 68Z" fill="white"/>
+  <text x="96" y="164" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="white">AWARE</text>
+</svg>

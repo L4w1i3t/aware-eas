@@ -1,0 +1,7 @@
+<!-- Basic SVG icon that will serve as placeholder -->
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="64" fill="#1f2937"/>
+  <path d="M256 128C318.751 128 370 179.249 370 242C370 304.751 318.751 356 256 356C193.249 356 142 304.751 142 242C142 179.249 193.249 128 256 128Z" fill="#667eea"/>
+  <path d="M256 168C296.869 168 330 201.131 330 242C330 282.869 296.869 316 256 316C215.131 316 182 282.869 182 242C182 201.131 215.131 168 256 168Z" fill="white"/>
+  <text x="256" y="430" font-family="Arial, sans-serif" font-size="36" font-weight="bold" text-anchor="middle" fill="white">AWARE EAS</text>
+</svg>

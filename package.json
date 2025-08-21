@@ -1,0 +1,35 @@
+{
+  "name": "aware-eas-simulation",
+  "version": "1.0.0",
+  "description": "AWARE EAS System - Smart Caching for Emergency Flood Warnings and EAS",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "date-fns": "^3.6.0",
+    "dexie": "^4.0.8",
+    "lucide-react": "^0.454.0",
+    "recharts": "^2.12.7"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "vite-plugin-pwa": "^0.20.5",
+    "@types/node": "^22.9.0",
+    "@typescript-eslint/eslint-plugin": "^8.15.0",
+    "@typescript-eslint/parser": "^8.15.0",
+    "eslint": "^9.15.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "workbox-window": "^7.1.0"
+  },
+  "type": "module"
+}

@@ -1,0 +1,24 @@
+{
+  "alerts": [
+    {
+      "id": "alert-001",
+      "title": "Flash Flood Warning",
+      "body": "Flash flooding in downtown area. Seek higher ground immediately.",
+      "severity": "Extreme",
+      "urgency": "Immediate",
+      "area": "Downtown Richmond",
+      "issued": "2025-08-20T18:30:00Z",
+      "expires": "2025-08-20T22:30:00Z"
+    },
+    {
+      "id": "alert-002", 
+      "title": "Flood Watch",
+      "body": "Potential flooding in low-lying areas. Monitor conditions.",
+      "severity": "Moderate",
+      "urgency": "Expected",
+      "area": "Riverside District",
+      "issued": "2025-08-20T16:00:00Z",
+      "expires": "2025-08-21T06:00:00Z"
+    }
+  ]
+}

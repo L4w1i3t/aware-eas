@@ -1,0 +1,31 @@
+{
+  "shelters": [
+    {
+      "id": "shelter-001",
+      "name": "Community Center North",
+      "address": "123 Main St",
+      "capacity": 200,
+      "available": 150,
+      "services": ["meals", "medical", "pets"],
+      "coordinates": [37.5407, -77.4360]
+    },
+    {
+      "id": "shelter-002", 
+      "name": "High School Gymnasium",
+      "address": "456 Oak Ave",
+      "capacity": 300,
+      "available": 280,
+      "services": ["meals", "medical"],
+      "coordinates": [37.5385, -77.4330]
+    },
+    {
+      "id": "shelter-003",
+      "name": "Recreation Center South", 
+      "address": "789 Pine St",
+      "capacity": 150,
+      "available": 120,
+      "services": ["meals", "pets"],
+      "coordinates": [37.5350, -77.4380]
+    }
+  ]
+}
