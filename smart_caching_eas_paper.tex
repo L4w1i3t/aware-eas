@@ -20,8 +20,12 @@
 \usepackage{tabularx}
 \usepackage{listings}
 \geometry{margin=0.75in}
+\usepackage[section]{placeins}
+\usepackage{stfloats}
+\setlength{\textfloatsep}{6pt plus 2pt minus 2pt}
+\setlength{\intextsep}{6pt plus 2pt minus 2pt}
+\hypersetup{hidelinks}
 
-% Configure code listings
 \lstset{
     basicstyle=\footnotesize\ttfamily,
     breaklines=true,
@@ -33,7 +37,6 @@
     language=C
 }
 
-% Define JavaScript-like language for listings
 \lstdefinelanguage{JavaScript}{
   keywords={typeof, new, true, false, catch, function, return, null, catch, switch, var, if, in, while, do, else, case, break, const, let, class, export, import, async, await},
   keywordstyle=\color{blue}\bfseries,
@@ -49,7 +52,6 @@
   morestring=[b]"
 }
 
-% Header and footer
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\scriptsize AWARE: Smart Caching for Emergency Flood Warnings}
@@ -59,16 +61,18 @@
 \title{\Large\textbf{Smart Caching and Offline Emergency Warning Systems for Flood Scenarios: AWARE EAS Framework}}
 
 \author{
-    \textbf{Charles Melvin}\textsuperscript{1}, \textbf{Prof. Nhat Rich Nguyen}\textsuperscript{2} \\
+    \textbf{Charles Melvin}\textsuperscript{1}, \textbf{N. Rich Nguyen}\textsuperscript{2} \\
     \small\textsuperscript{1}Department of Computer Science, University of Virginia, Charlottesville, VA 22903 \\
     \small\texttt{\{jgm6jy, nn4pj\}@virginia.edu}
 }
 
-\date{\small Submitted: Not yet lol}
+\date{\small Submitted: TBD}
 
 \begin{document}
 
 \maketitle
+
+\textbf{NOTE: THIS IS JUST A DRAFT/SCAFFOLD FOR THE PAPER AND IS NOT REFLECTIVE OF THE FINAL PRODUCT. ANY AND ALL MATERIAL IS SUBJECT TO CHANGE AT ANY TIME. ALL DATA AND SETTINGS RECORDED HERE ARE CURRENTLY ARBITRARY SIMULATIONS AND ARE NOT REFLECTIVE OF REAL WORLD DATA.}
 
 \begin{abstract}
 \noindent ABSTRACT NOT AVAILABLE YET
@@ -104,12 +108,8 @@ The primary challenges in flood emergency warning systems include:
     \item \textbf{Lack of human-centered metrics.} System performance is typically measured only in terms of delivery speed and coverage, with little attention to cognitive load, redundancy, or actionability under stress.
 \end{itemize}
 
-
 \subsection{Contributions}
-This paper presents the following key contributions:
-\begin{enumerate}
-\item DUMMY
-\end{enumerate}
+DUMMY
 
 \section{Related Work}
 
@@ -134,11 +134,11 @@ Decades of risk-communication research show that the efficacy of alerts depends 
 AWARE is implemented as a browser-hosted progressive web application (PWA) with four cooperating layers:
 
 \begin{enumerate}
-\item \textbf{UI \& Harness (React/TypeScript).} A Vite-bundled React shell mounts the simulation controls and results views. The harness selects a scenario (\texttt{urban}, \texttt{suburban}, \texttt{rural}), a cache policy (e.g., LRU or \texttt{PriorityFresh}), and a random seed, then drives the simulator to produce per-device samples and a summary metric vector.
+\item \textbf{UI \& Harness (React/TypeScript).} A Vite-bundled React shell mounts the simulation controls and results views. The harness selects a scenario (\texttt{urban}, \texttt{suburban}, \texttt{rural}), a cache policy, and a random seed, then drives the simulator to produce per-device samples and a summary metric vector.
 
 \item \textbf{Simulation Core.} Deterministic modules model (i) network sectors with throughput/RTT/drop parameters, (ii) end devices with a pluggable cache policy, and (iii) alert workloads. The core exposes \texttt{runSim({scenario, policy, seed})}, which returns \texttt{{summary, samples}}. A fixed-step logical clock avoids wall-clock dependence; a Mulberry32 PRNG ensures reproducibility.
 
-\item \textbf{Offline/Cache Layer (Service Worker).} A service worker intercepts requests and applies differentiated strategies: (i) \emph{network-first} for emergency endpoints (\texttt{/api/{alerts, emergency, shelters}}) with a dedicated \textit{alerts} cache; (ii) \emph{cache-first} for static assets; and (iii) \emph{stale-while-revalidate} for general API traffic. Successful emergency responses are stored with metadata (cached-at timestamp, priority hint) to enable audit and freshness management. Background Sync and Push handlers support deferred submission and high-priority notifications.
+\item \textbf{Offline/Cache Layer (Service Worker).} A service worker intercepts requests and applies differentiated caching strategies, described in detail in Section~5.2.
 
 \item \textbf{Local Data Store (Dexie/IndexedDB).} A typed Dexie database persists alert reports, shelter inventories, and run metadata for analysis, export, and offline continuity. Object-store indexes enable time-bounded queries (e.g., “active alerts now”) and quick filtering by severity/urgency.
 \end{enumerate}
@@ -259,7 +259,7 @@ This schema keeps emergency reads $\mathcal{O}(\log n)$ via time indexes, avoids
 
 \subsection{Cache Replacement Strategy}
 
-We introduce \texttt{PriorityFresh}, a hybrid replacement strategy that extends Least Recently Used (LRU) by considering both temporal freshness and semantic priority of alerts. When the cache reaches capacity, items are evicted according to the following rule: 
+We use a hybrid replacement strategy labeled PriorityFresh that extends Least Recently Used (LRU) by considering both temporal freshness and semantic priority of alerts. When the cache reaches capacity, items are evicted according to the following rule: 
 \begin{itemize}
     \item Expired or stale entries are removed first.
     \item Among remaining items, those with the lowest composite priority score are evicted.
@@ -307,18 +307,22 @@ Before delivery, alerts are filtered by a distance-weighted relevance score:
 \end{equation}
 where $d(a,u)$ is the haversine distance from user $u$ to alert polygon centroid. This ensures that nearby shelters and alerts remain cached even when outside strict polygons, providing resilience against geofence misalignments.
 
-\begin{table}[h]
+\begin{table}[t]
 \centering
 \caption{Priority Component Weights in AWARE}
-\begin{tabular}{@{}lccc@{}}
+\label{tab:priority-weights}
+\setlength{\tabcolsep}{4pt}
+\footnotesize
+\begin{tabularx}{\linewidth}{@{}l c c >{\raggedright\arraybackslash}X@{}}
 \toprule
-\textbf{Component} & \textbf{Symbol} & \textbf{Default Weight} & \textbf{Adaptation} \\ \midrule
-Severity & $S(a)$ & $w_1 = 0.35$ & Higher in life-threatening floods \\
-Urgency & $U(a)$ & $w_2 = 0.30$ & Boosted during active warnings \\
-Freshness & $F(a)$ & $w_3 = 0.20$ & Raised under congestion \\
-Location & $L(a)$ & $w_4 = 0.15$ & Boosted if user mobility is high \\
+\textbf{Component} & \textbf{Symbol} & \textbf{Default} & \textbf{Adaptation} \\ \midrule
+Severity  & $S(a)$ & $w_1=0.35$ & Higher in life-threatening floods \\
+Urgency   & $U(a)$ & $w_2=0.30$ & Boosted during active warnings \\
+Freshness & $F(a)$ & $w_3=0.20$ & Raised under congestion \\
+Location  & $L(a)$ & $w_4=0.15$ & Boosted if user mobility is high \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
+\vspace{-4pt}
 \end{table}
 
 \section{Implementation Details}
@@ -334,9 +338,6 @@ The AWARE prototype is implemented entirely client-side as a \textbf{Progressive
     \item \textbf{Local Database:} Dexie.js (IndexedDB wrapper) stores alerts, shelters, and experimental runs. Indexed queries enable efficient filtering by severity, urgency, and geokey.
     \item \textbf{Build/Runtime:} Node.js (v18+) with npm for development, with \texttt{vite} for fast bundling and hot reloads.
 \end{itemize}
-
-\paragraph{Reproducibility.}
-All simulation runs log their seed, configuration, and results into the Dexie database (\texttt{runs} table). Two RNG utilities are included: Mulberry32 for deterministic integer streams, and a utility generator (Box--Muller normals, exponential arrivals, shuffle/choice) for synthetic workloads. Each run can be exported to CSV for statistical analysis.
 
 \subsection{Offline Detection and Fallback}
 
@@ -402,29 +403,43 @@ Node~18+, Vite dev server, TypeScript~5. Build with \texttt{npm run build}; run 
 We run all experiments inside a browser-hosted PWA harness. A local “mock IPAWS” fixture under \texttt{/api/\{alerts, emergency, shelters\}} provides deterministic JSON responses for cold-start and offline tests. The simulation harness exposes four presets:
 
 \begin{itemize}
-  \item \textbf{Quick Baseline}: small population (1{,}000 devices), 30\,min duration, 3 fixed seeds.
-  \item \textbf{Comprehensive}: publication matrix (2{,}500 devices), 45\,min, 5 seeds for significance.
-  \item \textbf{Stress Test}: large population (5{,}000 devices) with extreme burst/duplicate rates.
-  \item \textbf{Cache Policy Comparison}: focused A/B across selected scenarios, 10 seeds.
+    \item \textbf{Quick Baseline}: 30\,min duration, 3 fixed seeds.
+    \item \textbf{Comprehensive}: 45\,min duration, 5 seeds for significance.
+    \item \textbf{Stress Test}: extreme burst/duplicate rates with larger populations.
 \end{itemize}
 
 Alerts are generated by a Poisson process with optional time-bounded bursts; severity/urgency follow configurable categorical draws; duplicate ratio controls redundancy. Devices are sampled into urban/suburban/rural sectors and assigned initial connectivity; targeted disruptions and congestion are injected to emulate outages.
 
-\begin{itemize}
-\item DUMMY
-\end{itemize}
-
 \subsubsection{Dataset Characteristics}
 
+Our experiments rely on synthetic but reproducible workloads designed to approximate real-world alert dynamics:
+
 \begin{itemize}
-\item DUMMY
+    \item \textbf{Alert Stream.} Alerts are generated via a Poisson process ($\lambda$ configurable) with burst modifiers to simulate flood escalation. Each alert follows a CAP-like schema with severity, urgency, and polygonal targeting.
+    \item \textbf{Shelter Data.} Shelters are sampled from a fixed pool (100 per urban scenario, 40 suburban, 15 rural). Each shelter is assigned capacity and status updates with exponential interarrival ($\mu$) to reflect staffing or occupancy changes.
+    \item \textbf{Connectivity.} Devices are stratified by sector type. Urban sectors see higher throughput but heavier congestion; rural sectors have higher baseline latency and dropout probability. Targeted disruptions (tower outages, backhaul saturation) are injected at controlled intervals.
+    \item \textbf{Device Population.} See presets in Section~6.1.1; all devices use seeded PRNGs for reproducibility.
 \end{itemize}
+
+\paragraph{Synthetic data disclaimer.}
+All datasets used in this study are fully synthetic and generated within the simulation harness. Polygons, shelter locations, and device populations are arbitrary and controlled, chosen solely to evaluate system behavior under reproducible conditions. No real-world geographic or personal data are included at this stage. Future work will extend this framework with geospatial datasets (e.g., FEMA floodplain polygons, NOAA hydrologic archives, municipal shelter inventories) to validate performance in field-grounded scenarios.
 
 \subsubsection{Performance Testing Scenarios}
 
+We define three classes of test:
+
 \begin{enumerate}
-\item DUMMY
+    \item \textbf{Baseline Control.} LRU-only caching, no prefetch. Measures the “status quo” for delivery latency, coverage, and redundancy.
+    \item \textbf{PriorityFresh Trials.} The proposed hybrid eviction strategy with adaptive weights. Compared against baseline across all sector types and populations.
+    \item \textbf{Stress/Failure Scenarios.} 
+        \begin{itemize}
+            \item \emph{Burst load:} 10$\times$ spike in simultaneous alerts. 
+            \item \emph{Partial outage:} 25–50\% of towers disabled for a 10\,min window. 
+            \item \emph{Duplicate floods:} Injected redundancy ratios (10–40\%) to test deduplication.
+        \end{itemize}
 \end{enumerate}
+
+Across all scenarios, runs are repeated with 5–10 random seeds for statistical significance. Metrics are collected directly from the Dexie-backed run logs and exported as CSV for later aggregation.
 
 \subsection{Performance Metrics}
 
@@ -458,8 +473,9 @@ Because emergency communication effectiveness extends beyond raw throughput, we 
 \subsubsection{Metrics Summary}
 Table~\ref{tab:metrics} summarizes how each metric is measured and why it matters in flood contexts.
 
-\begin{table}[ht]
+\begin{table}[t]
 \centering
+\footnotesize
 \caption{Evaluation Metrics for AWARE}
 \label{tab:metrics}
 \begin{tabularx}{\linewidth}{@{}l c X@{}}
@@ -475,14 +491,18 @@ Bytes per device & Quant. & Proxy for bandwidth and energy savings under stress 
 Actionability-first & Qual. & Reduces confusion; boosts compliance \\
 Redundancy index & Qual. & Limits cognitive overload under stress \\
 Timeliness consistency & Qual. & Supports trust through delivery uniformity \\
-Offline survival & Qual. & Guarantees continuity when connectivity is severed \\ 
+Offline survival & Qual. & Guarantees continuity when connectivity is severed \\
 \bottomrule
 \end{tabularx}
+\vspace{-4pt}
 \end{table}
 
-\begin{table}[ht]
+
+\begin{table}[t]
 \centering
+\footnotesize
 \caption{Harness outputs mapped to evaluation metrics}
+\label{tab:harness-mapping}
 \begin{tabular}{@{}l l@{}}
 \toprule
 Harness field & Paper metric \\ \midrule
@@ -494,100 +514,29 @@ Harness field & Paper metric \\ \midrule
 \texttt{finalConnectivity.*} & Outage state distribution / fairness \\
 \bottomrule
 \end{tabular}
+\vspace{-4pt}
 \end{table}
 
-\subsection{Results and Analysis}
 
-\subsubsection{Availability Performance}
-
-\begin{table}[ht]
-\centering
-\caption{System Availability Performance}
-\begin{tabular}{@{}lccc@{}}
-\end{tabular}
-\end{table}
-
-Key findings include:
-\begin{itemize}
-\item DUMMY
-\end{itemize}
-
-\subsubsection{Efficiency and Optimization Results}
-
-\begin{table}[ht]
-\centering
-\caption{Performance Comparison with Traditional Systems}
-\begin{tabular}{@{}lccc@{}}
-\end{tabular}
-\end{table}
-
-\subsubsection{Storage and Resource Optimization}
-\begin{itemize}
-\item DUMMY
-\end{itemize}
+\section{Results and Analysis}
+DUMMY
 
 \section{Discussion and Future Work}
-
-A distinctive contribution of AWARE is the incorporation of human-centered evaluation metrics. By tracking actionability-first ratio, redundancy index, and offline survival alongside classical measures such as latency and hit rate, AWARE bridges the gap between raw network performance and real-world usability. This perspective shows that resilience in flood communication is not only about keeping data moving, but also about reducing confusion, lowering cognitive load, and sustaining trust in the system under prolonged stress. Such findings suggest implications for policy and standards, where evaluation frameworks could expand beyond delivery speed to include user-centered reliability and psychological safety.
-
-\subsection{System Advantages and Impact}
-
-\subsubsection{Resilience and Reliability}
-\begin{itemize}
-\item DUMMY
-\end{itemize}
-
-\subsubsection{Performance and User Experience}
-\begin{itemize}
-\item DUMMY
-\end{itemize}
-
-\subsection{Current Limitations and Challenges}
-
-\subsubsection{Technical Constraints}
-\begin{itemize}
-\item DUMMY
-\end{itemize}
-
-\subsubsection{Operational Considerations}
-\begin{itemize}
-\item DUMMY
-\end{itemize}
-
-\subsection{Future Research Directions}
-
-\subsubsection{Advanced Intelligence and Prediction}
-\begin{itemize}
-\item DUMMY
-\end{itemize}
-
-\subsubsection{Network Architecture Evolution}
-\begin{itemize}
-\item DUMMY
-\end{itemize}
-
-\subsubsection{Enhanced User Interaction}
-\begin{itemize}
-\item DUMMY
-\end{itemize}
-
-\subsubsection{System Integration and Standardization}
-\begin{itemize}
-\item DUMMY
-\end{itemize}
+DUMMY
 
 \section{Conclusion}
+DUMMY
 
 \section*{Acknowledgments}
+DUMMY
 
-\textit{This research was conducted in compliance with institutional review board guidelines and emergency management best practices. No personal or sensitive data was used in the empirical process.}
-
-% Inline bibliography to avoid external file issues
+\FloatBarrier
+\clearpage
+\balance
 \begin{thebibliography}{99}
 
 \bibitem{fema-ipaws-2025}
 FEMA, ``Integrated Public Alert and Warning System (IPAWS),'' program overview, accessed Aug.\ 20, 2025. Available: \url{https://www.fema.gov/emergency-managers/practitioners/integrated-public-alert-warning-system}
-% FEMA IPAWS overview (official). Verified. 
 
 \bibitem{oasis-cap-1.2}
 OASIS, ``Common Alerting Protocol (CAP) Version 1.2,'' OASIS Standard, Jul.\ 1, 2010. Available: \url{https://docs.oasis-open.org/emergency/cap/v1.2/CAP-v1.2-os.html}
