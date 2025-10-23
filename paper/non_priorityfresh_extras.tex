@@ -1,0 +1,280 @@
+% Companion content pruned from the main paper to focus on PriorityFresh.
+% This file is a LaTeX fragment (no preamble). \input or \include it as needed.
+
+\section{Introduction}
+
+\subsection{Motivation}
+
+Unlike prior approaches that primarily optimize for network throughput and latency, AWARE is motivated by the reality that flood response hinges equally on human factors. People under stress need alerts that are timely, but also clear, non-duplicative, and trustworthy. Thus, the evaluation considers not only delivery speed and coverage, but also cognitive load and user trust---metrics such as redundancy index, actionability-first ratio, and timeliness consistency---so that system performance can be assessed in terms of both efficiency and psychological impact.
+
+\subsection{Problem Statement}
+The primary challenges in flood emergency warning systems include:
+
+\begin{itemize}
+    \item \textbf{Connectivity fragility.} Floods often cause localized outages of cellular towers, backhaul links, and power, leaving users disconnected exactly when alerts are most critical.
+    \item \textbf{Overload and congestion.} Spikes in simultaneous alert delivery can saturate networks, increasing latency and loss, especially in dense urban sectors.
+    \item \textbf{Staleness and duplication.} Existing broadcast channels may deliver multiple redundant alerts or stale updates, eroding clarity and user trust.
+    \item \textbf{Limited offline capability.} Current alerting systems assume continuous connectivity; without local caches, users cannot access critical instructions once offline.
+    \item \textbf{Lack of human-centered metrics.} System performance is typically measured only in terms of delivery speed and coverage, with little attention to cognitive load, redundancy, or actionability under stress.
+\end{itemize}
+
+\subsection{Contributions}
+\texttt{synthAlerts} inside \texttt{src/sim/run.ts} produces alerts via a Poisson arrival model whose rate is modulated by scenario segments. For every alert the seeded environment supplies a region identifier and local reliability multiplier; the generator tags the alert with that region, biases severity based on the region profile, and samples urgency from $\{\text{Immediate},\text{Expected},\text{Future},\text{Past},\text{Unknown}\}$. Successive updates are threaded using a \texttt{threadKey} and monotonic \texttt{updateNo}. During the run loop, segment-level reliability and the region multiplier jointly determine whether an arrival is delivered, while the query-side sampling routine ranks cached alerts by \emph{urgency first}, then severity, then freshness.
+
+\begin{itemize}
+    \item \textbf{Seeded environment and alert generator.} TypeScript modules in \texttt{src/sim} derive both alert streams and polygonal environments from a base Mulberry32 seed via deterministic derivations, so every run persists a reusable map of regions and local reliability multipliers and is fully reproducible from the recorded seed.
+    \item \textbf{Anomaly-aware Priority Forecasting.} PF uses regional anomaly history to modulate cache and push decisions, down-weighting chronically over-alerted or diversion-prone regions unless other signals outweigh history.
+    \item \textbf{Region-aware metrics.} Each simulation records deliveries, drops, and first-retrieval latency per region; the resulting \texttt{regionStats} power cross-tab overlays and align quantitative outputs with the rendered geography.
+    \item \textbf{Pluggable caching strategies.} Four cache policies (LRU, TTLOnly, PriorityFresh, and PAFTinyLFU) remain swappable at runtime, enabling direct comparison of cache hit rate, delivery rate, freshness, and redundancy metrics emitted by \texttt{runSimulation}.
+    \item \textbf{Batch experimentation harness.} Operators can request fixed, deterministically jittered, or randomized seed batches; \texttt{runBatch} executes replicates, aggregates mean/standard-deviation metrics, and records the derived seeds for replay.
+    \item \textbf{Offline-ready persistence.} The React/Vite front end writes delivered alerts, shelter records, and run metadata into a Dexie-backed IndexedDB (\texttt{src/db.ts}), so the Active Alerts and Runs History views operate without a network connection once data has been generated.
+    \item \textbf{Service integration scaffolding.} Client-side modules under \texttt{src/api} wrap Weather API and Mapbox endpoints, and the Services tab smoke-tests credentials while rendering a static map preview with the configured style.
+    \item \textbf{Contextual operator tooling.} A shared \texttt{SimulationContext} keeps the Results and Environment tabs in sync, surfacing seeded environments, region overlays, and replay controls alongside numeric metrics.
+\end{itemize}
+
+\section{Related Work}
+
+\subsection{Emergency Alert Systems}
+Modern public warning in the U.S. centers on FEMA's Integrated Public Alert and Warning System (IPAWS), which brokers alerts from authorized originators to distribution channels including Wireless Emergency Alerts (WEA), the broadcast Emergency Alert System (EAS), and NOAA Weather Radio \cite{nasem-2018-alerts}. IPAWS exchanges alert content using the Common Alerting Protocol (CAP) v1.2, enabling structured, multi-channel delivery and machine-readable metadata \cite{oasis-cap-1.2}. Since 2018, successive FCC rulemakings have tightened WEA performance requirements: device-based geo\-targeting must match the target area with no more than approximately 0.1~mile overshoot beyond the polygon, and providers must meet transmission speed and logging requirements \cite{fcc-2018-geo,fcc-wea-2023-doc}. Empirically, independent assessments demonstrate strong but nonuniform reach and latency. RAND/HSOAC's national survey of the Oct.\ 4, 2023 nationwide test characterizes receipt, opt-in, and demographic patterns \cite{rand-wea-2023-test}, while McBride \emph{et~al.} measured median delivery latencies on the order of seconds and largely accurate geofences in ShakeAlert-supported trials \cite{mcbride-2023-wea-latency}. These results motivate client-side resilience---e.g., prefetching, caching, and offline fallback---to hedge against residual gaps from congestion, RF shadowing, or localized outages.
+
+\subsection{Offline-First Applications}
+Offline-first design patterns let safety-critical apps remain usable under partial connectivity. Local-first software research demonstrates how conflict-free replicated data types and opportunistic synchronization preserve functionality when connectivity is intermittent, providing a foundation for resilient client caches and collaborative state \cite{kleppmann-2019-localfirst}. In emergency contexts, these findings motivate prefetch of hazard layers, durable storage of prior alerts for auditability, and continuity of core functions during network degradation.
+
+\subsection{Caching Strategies for Emergency Systems}
+Network-side caching can reduce tail latency and backhaul dependence during incident-driven traffic spikes. Surveys of mobile edge computing (MEC) detail cache placement and cooperation at the edge to improve hit rates and responsiveness for time-sensitive content \cite{mec-caching-survey-2023}. In Information-/Named-Data Networking (ICN/NDN), systematic surveys cover in-network caching strategies tuned to popularity, mobility, and energy constraints, including IoT deployments that resemble disrupted, ad hoc post-disaster networks \cite{icn-iot-caching-survey-2023}. Recent techniques explore learning-based placement (e.g., bandit/RL hybrids) and hybrid popularity/centrality policies to sustain performance under mobility and intermittent links \cite{cache-mab-2023,electronics-2024-koide-icanet}. Beyond hit ratio, "freshness" is a first-order requirement for real-time guidance; system-level treatments frame adaptive TTLs, invalidation, and priority refresh as design knobs that trade staleness against load and reach \cite{hotnets-2024-freshness}. AWARE adopts these lessons with priority-aware eviction and prefetch keyed to hazard severity, temporal sensitivity, and proximity.
+
+\subsection{Location-Based Emergency Services}
+Recent FCC rulemakings now expect polygonal targeting with device-assisted geofencing in WEA, minimizing over-alerting while maintaining high coverage inside the alert area \cite{fcc-2018-geo,fcc-wea-2023-doc}. Empirical geofencing studies quantify precision and recall as a function of radius, environment, operating system, and event type, informing practical buffer selection and distance-weighted ranking in location-aware filtering \cite{shevchenko-2023-geofencing}. These threads motivate a combination of device-level geofencing with cache priorities that elevate locally relevant, high-impact content during flood scenarios.
+
+\subsection{Human and Cognitive Factors in Emergency Communication}
+Decades of risk-communication research show that the efficacy of alerts depends on clarity, timing, trust, and cognitive load---not delivery alone. Classic work and subsequent syntheses emphasize concise, directive messages and pathways from warning receipt to protective action (e.g., the Protective Action Decision Model) \cite{mileti-1990-ornl6609,lindell-2012-padm,nasem-2018-alerts}. During disasters, social support and perceived control correlate with better psychological outcomes; resilient communication systems can buffer stress by maintaining a sense of connection even asynchronously \cite{cohen-1985-socialsupport,norris-2008-resilience}. For interface design, trust and progressive disclosure support comprehension and compliance under stress \cite{paton-2008-warningresponse}. AWARE aligns with these principles by prioritizing terse, high-impact messages; surfacing nearby shelters and actionable guidance first; and retaining background data for audit and continuity when connectivity is degraded.
+
+\section{System Architecture}
+AWARE is implemented as a browser-hosted single-page application composed of the following layers:
+
+\begin{enumerate}
+    \item \textbf{Interaction layer (React/TypeScript).} \texttt{App.tsx} coordinates simulation controls, results, run history, active alerts, shelter listings, and the environment view. A new \texttt{SimulationProvider} wraps the component tree so each tab consumes a shared snapshot of the latest run.
+    \item \textbf{Simulation core.} \texttt{runSimulation} in \texttt{src/sim/run.ts} now derives a seeded environment alongside alert synthesis, executes the selected cache policy, and emits metrics plus per-region delivery statistics. Scenario specifications in \texttt{src/sim/scenarios/*.ts} still describe alert rates, outages, and target first-delivery service level agreements, while all randomness flows through a deterministic Mulberry32 generator.
+    \item \textbf{Persistence layer (Dexie/IndexedDB).} \texttt{src/db.ts} defines the \texttt{AwareDB} schema with object stores for reports, shelters, runs, and key--value metadata. Helpers such as \texttt{putReports}, \texttt{putShelters}, and \texttt{logRun} persist the full run result so it can be replayed without re-executing the simulator.
+    \item \textbf{Context and data providers.} The environment generator in \texttt{src/sim/geo/generate.ts} turns the seeded RNG into polygonal regions with local reliability multipliers rendered by \texttt{EnvironmentView.tsx}. Static shelter data and service wrappers under \texttt{src/api} expose Weather and Mapbox readiness, and the Services tab now confirms credentials by rendering a Mapbox static preview.
+\end{enumerate}
+
+\noindent\textbf{Execution flow.} When the operator triggers \emph{Run Simulation}, the UI locks controls, invokes \texttt{runSimulation(options)}, and receives a payload that now bundles alerts, metrics, the seeded environment, and per-region stats. The snapshot is persisted to Dexie and injected into the shared \texttt{SimulationContext}, so history, active alerts, Results, and the Environment tabs all reference the same run without re-executing the core.
+
+\subsection{Data Model}
+The persisted data structures mirror the TypeScript types in \texttt{src/db.ts}.
+
+\subsubsection{Emergency Reports}
+Each report approximates a CAP message subset:
+\begin{itemize}
+    \item \texttt{id}: unique identifier generated by the simulator.
+    \item \texttt{eventType}: coarse category such as \texttt{Flood} or \texttt{Shelter}.
+    \item \texttt{severity} $\in \{\texttt{Minor}, \texttt{Moderate}, \texttt{Severe}, \texttt{Extreme}, \texttt{Unknown}\}$ and \texttt{urgency} $\in \{\texttt{Immediate}, \texttt{Expected}, \texttt{Future}, \texttt{Past}, \texttt{Unknown}\}$.
+    \item \texttt{issuedAt} / \texttt{expiresAt}: Unix seconds used for ``active now'' filtering.
+    \item Optional metadata: \texttt{headline}, \texttt{instruction}, \texttt{sizeBytes}, \texttt{geokey}, and \texttt{polygon}.
+\end{itemize}
+
+\subsubsection{Shelter Information}
+Shelter rows describe nearby options surfaced in the UI:
+\begin{itemize}
+    \item \texttt{id}, \texttt{name}, and optional \texttt{address}.
+    \item \texttt{coordinates}: longitude/latitude pairs for map integration.
+    \item \texttt{capacity} and \texttt{status} $\in \{\texttt{open}, \texttt{full}, \texttt{closed}\}$.
+    \item \texttt{updatedAt} timestamps and optional \texttt{geokey}.
+\end{itemize}
+
+\subsubsection{Run Metadata}
+Runs capture provenance for reproducibility:
+\begin{itemize}
+    \item \texttt{id}, \texttt{scenario}, \texttt{policy}, \texttt{seed}, and \texttt{timestamp}.
+    \item Serialized \texttt{metrics}, \texttt{samplesCount}, and optional \texttt{experimentName}, \texttt{notes}, \texttt{fullResults}.
+\end{itemize}
+
+\subsection{Plain-language interpretation}
+To make the simulator legible for non-technical stakeholders, core terms are aligned with their everyday meaning:
+\begin{itemize}
+    \item \textbf{Alert reports} are the notifications a resident would see (e.g., \emph{Flash Flood Warning}) along with the headline and instructions stored for offline reference.
+    \item \textbf{Polygons} approximate the neighborhood footprint that officials mark for a warning; the simulator replaces exact GIS shapes with simple polygons to demonstrate targeting.
+    \item \textbf{Geokeys} are grid labels (similar to a tile or zip-prefix) that let us group nearby locations without needing full maps.
+    \item \textbf{Cache policies} describe which alerts a handset keeps in its local storage so the message is still there when connectivity drops.
+    \item \textbf{Freshness / TTL} correspond to the "expires after" time that tells residents when guidance goes out of date.
+    \item \textbf{Seeds and seed modes} are the recipe cards for the random number generator; they enable replay of the same flood timeline or controlled variation (deterministic jitter) when comparing runs.
+    \item \textbf{Replicates} act like repeating the same field drill several times to see how consistent the outcomes are.
+    \item \textbf{Metrics} such as cache-hit rate, redundancy index, and timeliness consistency are direct proxies for questions public safety teams ask: Did people get the alert? Were they swamped with duplicates? Did critical updates arrive on time?
+    \item \textbf{Dexie/IndexedDB} is simply the browser's local database; it holds alerts, shelter lists, and audit logs so the interface keeps working offline.
+    \item \textbf{Environment providers} (weather, Mapbox) are future data feeds; the UI currently shows whether API keys are present to indicate readiness for live integration.
+\end{itemize}
+
+\subsection{Database Schema}
+Dexie manages the IndexedDB stores via the following definition:
+
+\begin{lstlisting}[language=JavaScript, caption={AWARE database definition in `src/db.ts`}]
+export class AwareDB extends Dexie {
+  reports!: Table<Report, string>;
+  shelters!: Table<Shelter, string>;
+  runs!: Table<RunMeta, string>;
+  kvs!: Table<KV, string>;
+
+  constructor() {
+    super('awareDB');
+    this.version(1).stores({
+      reports: 'id, issuedAt, expiresAt, severity, urgency, geokey, eventType',
+      shelters: 'id, geokey, status, updatedAt, name',
+      runs: 'id, timestamp, scenario, policy, seed, experimentName',
+      kvs: 'key'
+    });
+  }
+}
+\end{lstlisting}
+
+\paragraph{Query patterns.}
+\texttt{ActiveAlerts.tsx} filters by \texttt{issuedAt} and \texttt{expiresAt}, then ranks by severity and urgency. \texttt{RunsHistory.tsx} orders runs by timestamp and exports JSON/CSV snapshots, while \texttt{NearbyShelters.tsx} seeds the shelters store from \texttt{/api/shelters/index.json} when empty and performs name-ordered lookups thereafter.
+
+\section{Additional Algorithmic and Simulator Details}
+
+\subsection{Probabilistic TinyLFU admission}
+\texttt{PAFTinyLFUCache.ts} augments a recency queue with a 4K-cell TinyLFU sketch. An incoming alert is mapped to its thread key (or id) and admitted only if its estimated frequency is at least as large as the sampled victim. This follows the windowed TinyLFU family \cite{einziger-2017-wtinylfu} and is useful for comparing semantic prioritisation against frequency-driven strategies inside the simulator.
+
+\paragraph{Victim selection.} The implementation samples a small set (up to 8) of the oldest entries and chooses the one with the smallest sketch estimate as the eviction victim, providing a simple and efficient approximation while preserving recency hints.
+
+\subsection{Query-side retrieval bias}
+The simulator models end-user queries by sampling from the cache with a bias toward alerts that are both urgent and severe, tempered by freshness. Algorithm~\ref{alg:urgency-first-retrieval} captures the proportional sampling scheme used during queries.
+
+\begin{algorithm}[t]
+\caption{Urgency-first cache retrieval sampling}
+\label{alg:urgency-first-retrieval}
+\begin{algorithmic}[1]
+\REQUIRE cache entries $\mathcal{C}$ at time $t$
+\STATE For each $a\in\mathcal{C}$, compute freshness $f(a,t)=e^{-(t-a_{\text{issued}})/\max(1,\text{ttl}(a))}$
+\STATE Map severity $s(a)\in\{1,2,3,4\}$ with Minor$\to 1$, Moderate$\to 2$, Severe$\to 3$, Extreme$\to 4$ (Unknown $\approx 1$)
+\STATE Map urgency $u(a)\in\{1,2,3\}$ with Future/Past/Unknown$\to 1$, Expected$\to 2$, Immediate$\to 3$
+\STATE Form weight $w(a)=u(a)\cdot s(a)\cdot f(a,t)$
+\STATE Sample one alert from $\mathcal{C}$ proportionally to $w(a)$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{table}[t]
+\centering
+\caption{Ordinal encodings used during query-side sampling}
+\label{tab:ordinals}
+\begin{tabular}{ll|ll}
+Severity & $s(a)$ & Urgency & $u(a)$ \\
+\midrule
+Extreme & 4 & Immediate & 3 \\
+Severe & 3 & Expected & 2 \\
+Moderate & 2 & Future & 1 \\
+Minor & 1 & Past & 1 \\
+Unknown & $\approx 1$ & Unknown & 1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Duplicate awareness}
+The simulator tracks \texttt{threadKey} and \texttt{updateNo} fields on alerts to compute redundancy metrics. Cache policies themselves operate on alert identifiers, but the run loop increments duplicate counters whenever multiple updates from the same thread are delivered, allowing the UI to display a redundancy index regardless of the chosen eviction strategy.
+
+\subsection{PF model: learning to push and prioritize}
+\label{sec:pf-model}
+To couple domain semantics with observed outcomes, a lightweight probabilistic model maps alert/context features to a probability of high utility $p \in [0,1]$. A logistic link with temperature scaling and online updates is used:
+$$
+p(a,t) = \sigma\big(\tfrac{1}{T}\,\mathbf{w}^\top \mathbf{x}(a,t)\big),\quad
+\sigma(z) = \tfrac{1}{1+e^{-z}},
+$$
+where $T{>}0$ calibrates probabilities. The feature vector combines alert semantics, region severity/local reliability, synthesized hydrology proxies, a normalized base score $\hat{b}$, time-of-day features $(\sin\phi,\cos\phi)$, a normalized update counter, and a hashed embedding of categorical keys:
+\begin{align*}
+\mathbf{x}(a,t) = [\,&1,\ s(a),\ u(a),\ \tfrac{\mathrm{ttl}(a)}{1\,\mathrm{h}},\ f(a,t),\ s_{\text{region}},\ r_{\text{local}},\\
+& q_{\text{flood}},\ q_{\text{rain}},\ v_{\text{rain}},\ d_{\text{risk}},\ h_{\text{shelter}},\ \hat{b}(a,t),\\
+& \alpha_{\text{false}},\ \alpha_{\text{divert}},\ \alpha_{\text{acc}},\ \alpha_{\text{lead}},\ \alpha_{\text{under}},\ \alpha_{\text{over}},\ \alpha_{\text{comp}},\\
+& \sin\phi,\ \cos\phi,\ \tilde{u},\ H_1,\ldots,H_K\,],
+\end{align*}
+with $\phi = 2\pi\,\mathrm{mod}(t,86400)/86400$, $\tilde{u}\in[0,1]$ the normalized update number, and $H_k$ the $K$ hash-bucket indicators derived from (event type, region id, thread key).
+
+\subsubsection{Anomaly-aware features}
+We augment the feature vector with region-level anomaly cues (false-alarm propensity, diversion likelihood, historical accuracy, and lead-time characteristics), summarized by a composite reliability term. This enables priority decisions that reflect local patterns without hand-tuned rules. The composite is
+$$
+\alpha_{\text{comp}} = 0.5\,\alpha_{\text{acc}} + 0.25\,(1-\alpha_{\text{false}}) + 0.15\,(1-\alpha_{\text{divert}}) + 0.1\,\alpha_{\text{trend}},
+$$
+where $\alpha_{\text{trend}}$ captures whether prediction quality is improving or degrading over time. As an illustration, if a region routinely sees head-on storms divert at the last minute, the learned weights reduce the priority of similar alerts unless other signals (e.g., extreme severity or unusual rainfall) outweigh history.
+
+After each retrieval or drop, a scalar label $y \in [0,1]$ is formed from freshness and timeliness components, and weights are updated using Adagrad with exponential decay (forgetting) and $\ell_2$ regularization:
+$$
+g_i \leftarrow \rho\,g_i + (\partial_i)^2,\quad
+w_i \leftarrow (1-\lambda)\,w_i + \frac{\eta}{\sqrt{g_i+\epsilon}}\,\partial_i,\quad \partial_i=(y-p)\,x_i.
+$$
+The learner supports $\epsilon$-greedy exploration and supplies (i) $p$ for the push decision (Section\,\ref{sec:push-optimization}) and (ii) an additive boost $\Delta$ to PriorityFresh for eviction ordering. For continuity, a serializable PF state (weights, accumulators, and hyperparameters) is persisted with each run and can optionally warm-start the next run.
+
+\section{Implementation Details}
+\subsection{Technology stack}
+\begin{itemize}
+    \item \textbf{Frontend.} React 18 with TypeScript and Vite powers the SPA. Styling relies on the global CSS in \texttt{src/index.css}.
+    \item \textbf{Simulation modules.} Pure TypeScript under \texttt{src/sim} implements random generators, scenarios, geo environment generation, and cache policies without DOM dependencies.
+    \item \textbf{Persistence.} Dexie (\texttt{db.ts}) wraps IndexedDB to provide typed tables and bulk helpers.
+    \item \textbf{Visualization.} Results use a lazily loaded \texttt{TimeChart} component built on Recharts to plot cache size, hits, and misses over time, and \texttt{EnvironmentView} renders SVG reliability maps.
+    \item \textbf{Integrations.} Weather and Mapbox service wrappers (\texttt{src/api/}) expose typed helpers for fetching live data, while \texttt{ServicesPanel.tsx} provides an in-app integration check.
+\end{itemize}
+
+\subsection{Simulation workflow}
+\texttt{App.tsx} seeds default run options and exposes form controls for scenario, policy, cache size, alert volume, network reliability, duration, query rate, random seed, seed mode (fixed, deterministic jitter, randomized), and replicate count. Push controls include a per-minute rate limit $R$, a dedup window $D$, and an optional PF threshold $\tau$. When a run begins, controls are disabled. If batches are requested, \texttt{runBatch} derives the replicate seeds, runs the simulator repeatedly, aggregates mean/standard-deviation metrics, and logs every replicate with its seed, seed mode, and batch identifier before persisting the final run's alerts; otherwise \texttt{runSimulation} executes once and the results are stored immediately.
+
+\subsection{Shelter and alert views}
+\texttt{ActiveAlerts.tsx} reads the reports table, filtering by the current wall-clock timestamp ($\texttt{issuedAt} \leq \texttt{now} < \texttt{expiresAt}$) and sorting by severity and urgency. \texttt{NearbyShelters.tsx} calls \texttt{putShelters} with static JSON the first time it runs to seed the database, then lists shelters with status, address, and optional capacity. Both views operate offline when the underlying stores are populated.
+
+\subsection{Environment generator}
+\texttt{EnvironmentView.tsx} now consumes the shared snapshot: when a run is active it renders the seeded environment returned by \texttt{runSimulation}, overlays delivered/dropped counts per region, and keeps the time slider in sync with the Results tab. Operators can switch to a custom sandbox mode to experiment with deterministic seeds or random reshuffles, adjust the number of regions, and scrub scenario time to visualise how reliability segments modulate the effective baseline. A provider status footer still surfaces Weather and Mapbox readiness to confirm external integrations.
+
+In live mode, a region selector (and clickable polygons) surfaces a personalized alert queue for the chosen region. The queue derives from the \texttt{issuedAlerts} set in the last run and orders entries by urgency, then severity, then freshness (which decays exponentially with age relative to TTL and current scrub time). This view illustrates how the same shared alert set yields region-specific rankings without duplicating content.
+
+\subsection{External service integrations}
+The Services tab (\texttt{ServicesPanel.tsx}) surfaces Weather API and Mapbox connectors built in \texttt{src/api/}. It reads credentials from \texttt{.env} (\texttt{VITE\_WEATHER\_API\_KEY}, \texttt{VITE\_MAPBOX\_TOKEN}, \texttt{VITE\_MAPBOX\_USERNAME}), lets operators pull a one-off weather snapshot for a chosen latitude/longitude, and renders a Mapbox static map preview or geocoded search results. These helpers are designed so the same code can hydrate shelter overlays or scenario seeds with live data when production feeds are available.
+
+\section{Experimental Evaluation}
+\subsection{Simulation controls}
+Operators interact with the simulator through the form in \texttt{Controls.tsx}. Key parameters map directly to the \texttt{RunOptions} type: scenario (rural, suburban, urban), cache policy, cache capacity, number of alerts to generate, baseline network reliability, run duration, query rate, and random seed. The panel also exposes a seed mode selector (fixed, deterministic jitter, randomized) and a replicate counter so operators can collect batches without leaving the UI. PriorityFresh-specific weights $w_S, w_U, w_F$ can be adjusted from the same panel, and every completed run posts a snapshot to the shared context so the Results tab can jump directly into the Environment view.
+
+\subsection{Synthetic alert generation}
+\texttt{synthAlerts} inside \texttt{src/sim/run.ts} produces alerts via a Poisson arrival model whose rate is modulated by scenario segments. For every alert the seeded environment supplies a region identifier and local reliability multiplier; the generator tags the alert with that region, biases severity based on the region profile, and samples urgency from $\{\text{Immediate},\text{Expected},\text{Future},\text{Past},\text{Unknown}\}$. Successive updates are threaded using a \texttt{threadKey} and monotonic \texttt{updateNo}. During the run loop, segment-level reliability and the region multiplier jointly determine whether an arrival is delivered, while a biased sampling routine still favours fresh, severe alerts when users query the cache.
+
+\subsection{Metrics captured}
+The simulator returns a \texttt{RunResult} struct with:
+\begin{itemize}
+    \item \textbf{cacheHitRate}: fraction of queries served from the cache.
+    \item \textbf{deliveryRate}: alerts successfully delivered versus generated.
+    \item \textbf{avgFreshness}: exponential freshness score averaged over cache hits.
+    \item \textbf{staleAccessRate}: proportion of cache hits below the freshness threshold.
+    \item \textbf{redundancyIndex}: duplicate deliveries per thread relative to total deliveries.
+    \item \textbf{actionabilityFirstRatio}: fraction of first retrievals that were severe or extreme or immediate.
+    \item \textbf{timelinessConsistency}: share of threads retrieved before the scenario SLA.
+    \item \textbf{pushesSent}: number of push notifications issued under the rate limit and dedup rules.
+    \item \textbf{pushSuppressRate}: share of push opportunities that were suppressed (rate limit, dedup, or threshold).
+    \item \textbf{pushDuplicateRate}: fraction of pushes that were repeats within the same thread beyond the dedup window.
+    \item \textbf{pushTimelyFirstRatio}: fraction of threads where the first push occurred within the SLA.
+\end{itemize}
+Batch runs also compute the mean and standard deviation for each metric across replicates, which the Results view surfaces alongside individual timelines. Timeline samples (time, cache size, cumulative hits and misses) feed the Recharts line plot shown in the Results tab. Each run now also retains the seeded environment and a per-region summary (delivered, dropped, first-retrieval latency), enabling the Environment tab to overlay quantitative statistics on the same polygons that informed the simulation.
+
+\subsection{Run history and export}
+Every invocation of the simulator (single or batch) writes the full payload and configuration into the Dexie \texttt{runs} table. Each record carries the seed, seed mode, replicate index/count, and (when applicable) a batch identifier so offline analyses can reconstruct the exact sequence of seeds. \texttt{RunsHistory.tsx} orders entries by timestamp, surfaces replicate/batch metadata, and offers JSON/CSV export buttons; each row also exposes a \emph{Show} control that reloads the stored \texttt{RunResult} into the shared context and jumps to the Environment tab. Because alert deliveries are persisted, the Active Alerts tab can replay ``current'' alerts using wall-clock time without re-running the simulator. CSV files are downloaded via the browser; operators often save them under \texttt{data/} (for example, \texttt{data/aware-runs-<timestamp>.csv}) to keep plotting inputs versioned with the code. In addition to run-level metrics, the stored \texttt{fullResults} retain the complete list of issued alerts, the subset of delivered alerts, and the PF model state (\texttt{pfState}) for warm-start experiments.
+
+\subsection{Data exports for plotting}
+The Runs CSV mirrors the column ordering used in earlier snapshots (e.g., \texttt{aware-runs-*.csv}). Two additional exports support alert-level analysis: an \emph{Alerts CSV} that lists all issued alerts with a \texttt{delivered} flag, and a \emph{Delivered Alerts CSV} that includes only delivered alerts. Analysts can import these files into pandas/R/spreadsheets to generate figures; typical workflows group by policy or scenario, compute confidence intervals across replicates, and emit plots directly from the exported CSVs.
+
+\subsection{Current limitations}
+The harness presently evaluates one device abstraction at a time and omits real network IO; all data originate from the synthetic generator. Integrating real CAP feeds or mobile traces requires extending the data model and replacing the synthetic arrival process, as outlined in Section~\ref{sec:discussion-future}.
+
+\section{Results and Analysis}
+The current codebase focuses on instrumentation rather than completed experiments. Each interactive run yields the metrics described in Section~6, stores them for export, and links the numeric output to a seeded environment overlay. After scenarios are calibrated and scripted runs executed, this section summarises comparative findings between cache policies and relates them to the spatial distributions surfaced in the Environment tab. Plots are generated directly from the exported CSVs.
+
+\section{Discussion and Future Work}
+\label{sec:discussion-future}
+Near-term work extends the simulator in four directions:
+
+\begin{enumerate}
+    \item \textbf{Real data ingest.} Replace synthetic alerts with CAP feeds or NOAA archives, map them onto the existing report schema, and validate the reliability segments against empirical outage data.
+    \item \textbf{Device diversity.} Model heterogeneous devices and bandwidth constraints to observe policy performance across concurrent clients, not just the aggregated cache used in the current harness.
+    \item \textbf{Offline delivery pipeline.} Introduce a service worker with background sync so shelters and alerts continue to refresh when connectivity is intermittent, aligning the implementation with the architectural goals outlined in the introduction.
+    \item \textbf{Bayesian priority tuning.} Extend the new \texttt{sim/learning/bayesian.ts} scaffold so observed freshness outcomes adjust cache weights (e.g., $w_S, w_U, w_F$) using posterior estimates rather than fixed heuristics.
+\end{enumerate}
+
+\section{Conclusion}
+DUMMY
+
+\section*{Acknowledgments}
+DUMMY
